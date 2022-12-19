@@ -31,4 +31,8 @@ COPY /root /
 # ports and volumes
 EXPOSE 3000
 
+LABEL org.opencontainers.image.source=https://github.com/rogerrum/docker-openttd
+LABEL org.opencontainers.image.description="OpenTTD"
+LABEL org.opencontainers.image.licenses=Apache-2.0
+
 VOLUME /config
