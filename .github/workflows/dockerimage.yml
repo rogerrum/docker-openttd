@@ -1,0 +1,124 @@
+---
+name: Docker Image CI
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    branches:
+      - main
+
+env:
+  DOCKER_REPO_NAME: rogerrum
+  DOCKER_IMAGE_NAME: docker-openttd
+
+jobs:
+  # Get list of versions
+  get-versions:
+    name: Get Versions for OpenTTD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Versions
+        id: get_versions
+        # yamllint disable-line rule:line-length
+        run: |
+          echo "::set-output name=versions::$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '[.[:10]|.[]|.tag_name]')"
+          echo "::set-output name=latest::$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')"
+          echo "::set-output name=gfxVersion::$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenGFX/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')"
+      - name: Output Versions
+        run: |
+          echo ${{ steps.get_versions.outputs.versions }}
+          echo ${{ steps.get_versions.outputs.latest }}
+          echo ${{ steps.get_versions.outputs.opengfx }}
+    outputs:
+      versions: ${{ steps.get_versions.outputs.versions }}
+      latest: ${{ steps.get_versions.outputs.latest }}
+      opengfx: ${{ steps.get_versions.outputs.opengfx }}
+
+  # Build openttd images
+  build:
+    runs-on: ubuntu-latest
+    needs: get-versions
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.get_versions.outputs.versions) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Docker login - docker hub
+        uses: azure/docker-login@v1
+        with:
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Docker login - ghcr
+        uses: azure/docker-login@v1
+        with:
+          login-server: ghcr.io
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+
+      - name: Set up Qemu
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Output platforms
+        run: |
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+
+      - name: Build and push ${{ matrix.version }} with latest tag
+        if: needs.get-versions.outputs.latest == matrix.version
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          pull: true
+          build-args: |
+            OPENTTD_VERSION=${{ matrix.version }}
+            OPENGFX_VERSION=${{ needs.get-versions.outputs.opengfx }}
+          tags: |
+            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
+            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
+
+      - name: Build and push ${{ matrix.version }}
+        if: needs.get_versions.outputs.latest != matrix.version
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          pull: true
+          build-args: |
+            OPENTTD_VERSION=${{ matrix.version }}
+            OPENGFX_VERSION=${{ needs.get-versions.outputs.opengfx }}
+          tags: |
+            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
+            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
+
+      # Trivy test
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        id: trivy
+        with:
+          image-ref: 'ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}'
+          format: 'sarif'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: results.sarif
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'results.sarif'
