@@ -2,7 +2,6 @@
 
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/rogerrum/docker-openttd?sort=semver)](https://hub.docker.com/r/rogerrum/docker-openttd/tags)
 [![license](https://img.shields.io/github/license/rogerrum/docker-openttd)](https://github.com/rogerrum/docker-openttd/blob/main/LICENSE)
-[![DockerHub pulls](https://img.shields.io/docker/pulls/rogerrum/docker-openttd.svg)](https://hub.docker.com/r/rogerrum/docker-openttd/)
 [![GitHub stars](https://img.shields.io/github/stars/rogerrum/docker-openttd.svg)](https://github.com/rogerrum/docker-openttd)
 [![Contributors](https://img.shields.io/github/contributors/rogerrum/docker-openttd.svg)](https://github.com/rogerrum/docker-openttd/graphs/contributors)
 
