@@ -44,7 +44,7 @@ image. Just download the repo and run it like so:
 ```yaml
 version: '3.8'
 services:
-  oscar:
+  openttd:
     image: ghcr.io/rogerrum/docker-openttd:latest
     container_name: openttd
     restart: unless-stopped
