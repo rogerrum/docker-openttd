@@ -14,28 +14,31 @@ env:
 
 jobs:
   # Get list of versions
-  get-versions:
-    name: Get Versions for OpenTTD
+  get-latest-version:
+    name: Get Latest Release Version for OpenTTD/OpenGFX
     runs-on: ubuntu-latest
     steps:
-      - name: Get Versions
-        id: get_versions
+      - name: Get TTD Version
+        id: get_ttd_version
         run: |
           # Fetch the latest stable release (exclude beta versions)
-          echo "latest=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
+          echo "version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
 
+      - name: Get GFX Version
+        id: get_gfx_version
+        run: |
           # Fetch the latest stable release of OpenGFX (exclude beta versions)
-          echo "opengfx=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenGFX/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
+          echo "version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenGFX/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
 
       - name: Output Versions
         run: |
           # Output the versions for further use
-          echo "Latest Stable Release: ${{ steps.get_versions.outputs.latest }}"
-          echo "Latest OpenGFX Release: ${{ steps.get_versions.outputs.opengfx }}"
+          echo "Latest OpenTTD Release: ${{ steps.get_ttd_version.outputs.version }}"
+          echo "Latest OpenGFX Release: ${{ steps.get_gfx.outputs.version }}"
 
     outputs:
-      latest: ${{ steps.get_versions.outputs.latest }}
-      opengfx: ${{ steps.get_versions.outputs.opengfx }}
+      openttd: ${{ steps.get_ttd_version.outputs.version }}
+      opengfx: ${{ steps.get_gfx_version.outputs.version }}
 
 #  # Build openttd images
 #  build:
