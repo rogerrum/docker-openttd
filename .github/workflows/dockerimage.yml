@@ -67,7 +67,9 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: check-image-version
+    needs:
+      - check-image-version
+      - get-latest-version
     if: ${{ needs.check-image-version.outputs.skip_build == false }}
 
     steps:
@@ -98,50 +100,44 @@ jobs:
         run: |
           echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
 
-#      - name: Build and push ${{ matrix.version }} with latest tag
-#        if: needs.get-versions.outputs.latest == matrix.version
-#        uses: docker/build-push-action@v4
-#        with:
-#          push: true
-#          pull: true
-#          platforms: linux/arm64,linux/amd64
-#          build-args: |
-#            OPENTTD_VERSION=${{ matrix.version }}
-#            OPENGFX_VERSION=${{ needs.get-versions.outputs.opengfx }}
-#          tags: |
-#            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-#            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
-#            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-#            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
-#
-#      - name: Build and push ${{ matrix.version }}
-#        if: needs.get-versions.outputs.latest != matrix.version
-#        uses: docker/build-push-action@v4
-#        with:
-#          push: true
-#          pull: true
-#          build-args: |
-#            OPENTTD_VERSION=${{ matrix.version }}
-#            OPENGFX_VERSION=${{ needs.get-versions.outputs.opengfx }}
-#          tags: |
-#            ${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
-#            ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}
-#
-#      # Trivy test
-#      - name: Run Trivy vulnerability scanner
-#        uses: aquasecurity/trivy-action@master
-#        id: trivy
-#        with:
-#          image-ref: 'ghcr.io/${{ env.DOCKER_REPO_NAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.version }}'
-#          format: 'sarif'
-#          exit-code: '0'
-#          ignore-unfixed: true
-#          vuln-type: 'os,library'
-#          severity: 'CRITICAL,HIGH'
-#          output: results.sarif
-#
-#      - name: Upload Trivy scan results to GitHub Security tab
-#        uses: github/codeql-action/upload-sarif@v2
-#        if: always()
-#        with:
-#          sarif_file: 'results.sarif'
+      - name: Build and push with latest tag
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          pull: true
+          platforms: linux/arm64,linux/amd64
+          build-args: |
+            OPENTTD_VERSION=${{ needs.get-latest-version.outputs.openttd }}
+            OPENGFX_VERSION=${{ needs.get-latest-version.outputs.opengfx }}
+          tags: |
+            rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+            rogerrum/docker-openttd:latest
+            ghcr.io/rogerrum/docker-openttd:latest
+            ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+
+      - name: Docker Hub Description
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: rogerrum/docker-openttd
+
+      # Trivy test
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        id: trivy
+        with:
+          image-ref: 'ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}'
+          format: 'sarif'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: results.sarif
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'results.sarif'
