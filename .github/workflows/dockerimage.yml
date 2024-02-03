@@ -34,11 +34,37 @@ jobs:
         run: |
           # Output the versions for further use
           echo "Latest OpenTTD Release: ${{ steps.get_ttd_version.outputs.version }}"
-          echo "Latest OpenGFX Release: ${{ steps.get_gfx.outputs.version }}"
+          echo "Latest OpenGFX Release: ${{ steps.get_gfx_version.outputs.version }}"
 
     outputs:
       openttd: ${{ steps.get_ttd_version.outputs.version }}
       opengfx: ${{ steps.get_gfx_version.outputs.version }}
+
+  get-last-image-version:
+    needs: get-latest-version
+    name: Get Latest Image Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if image exists
+        id: check_image
+        run: |
+          # Replace 'your-container-registry' and 'your-repo' with your actual container registry and repository names
+          if docker pull rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}; then
+            echo "Image version already exists. Skipping build."
+            echo "skip_build=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Image version does not exist. Proceeding with the build."
+            echo "skip_build=false" >> "${GITHUB_OUTPUT}"
+          fi
+        continue-on-error: true  # Allow failure as we want to proceed with the build even if the image doesn't exist
+
+      - name: Output
+        run: |
+          echo "Skip Build: ${{ steps.check_image.outputs.skip_build }}"
+
+    outputs:
+      skip: ${{ steps.check_image.outputs.skip_build }}
+
 
 #  # Build openttd images
 #  build:
