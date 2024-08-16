@@ -51,10 +51,10 @@ jobs:
           # Replace 'your-container-registry' and 'your-repo' with your actual container registry and repository names
           if docker pull rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}; then
             echo "Image version already exists. Skipping build."
-            echo "skip_build='true'" >> "${GITHUB_OUTPUT}"
+            echo "skip_build=true" >> "${GITHUB_OUTPUT}"
           else
             echo "Image version does not exist. Proceeding with the build."
-            echo "skip_build='false'" >> "${GITHUB_OUTPUT}"
+            echo "skip_build=false" >> "${GITHUB_OUTPUT}"
           fi
         continue-on-error: true  # Allow failure as we want to proceed with the build even if the image doesn't exist
 
