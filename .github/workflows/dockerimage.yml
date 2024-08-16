@@ -1,3 +1,4 @@
+---
 name: Docker Image CI
 
 on:
@@ -21,21 +22,19 @@ jobs:
         id: get_ttd_version
         run: |
           # Fetch the latest stable release (exclude beta versions)
-          version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')
-          echo "OPENTTD_VERSION=${version}" >> $GITHUB_ENV
+          echo "version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenTTD/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
 
       - name: Get GFX Version
         id: get_gfx_version
         run: |
           # Fetch the latest stable release of OpenGFX (exclude beta versions)
-          version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenGFX/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')
-          echo "OPENGFX_VERSION=${version}" >> $GITHUB_ENV
+          echo "version=$(curl -s -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/OpenTTD/OpenGFX/releases | jq -cMr '([.[]|select(all(.tag_name; contains("beta")|not))])|.[:1]|.[].tag_name')" >> "${GITHUB_OUTPUT}"
 
       - name: Output Versions
         run: |
           # Output the versions for further use
-          echo "Latest OpenTTD Release: ${{ env.OPENTTD_VERSION }}"
-          echo "Latest OpenGFX Release: ${{ env.OPENGFX_VERSION }}"
+          echo "Latest OpenTTD Release: ${{ steps.get_ttd_version.outputs.version }}"
+          echo "Latest OpenGFX Release: ${{ steps.get_gfx_version.outputs.version }}"
 
     outputs:
       openttd: ${{ steps.get_ttd_version.outputs.version }}
@@ -49,95 +48,96 @@ jobs:
       - name: Check if image exists
         id: check_image
         run: |
+          # Replace 'your-container-registry' and 'your-repo' with your actual container registry and repository names
           if docker pull rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}; then
             echo "Image version already exists. Skipping build."
-            echo "skip_build=true" >> $GITHUB_ENV
+            echo "skip_build='true'" >> "${GITHUB_OUTPUT}"
           else
             echo "Image version does not exist. Proceeding with the build."
-            echo "skip_build=false" >> $GITHUB_ENV
+            echo "skip_build='false'" >> "${GITHUB_OUTPUT}"
           fi
         continue-on-error: true  # Allow failure as we want to proceed with the build even if the image doesn't exist
 
       - name: Output
         run: |
-          echo "Skip Build: ${{ env.skip_build }}"
+          echo "Skip Build: ${{ steps.check_image.outputs.skip_build }}"
 
     outputs:
-      skip: ${{ env.skip_build }}
+      skip: ${{ steps.check_image.outputs.skip_build }}
 
-  # build:
-  #   runs-on: ubuntu-latest
-  #   needs:
-  #     - check-image-version
-  #     - get-latest-version
-  #   if: ${{ needs.check-image-version.outputs.skip == 'false' }}
+  build:
+    runs-on: ubuntu-latest
+    needs:
+      - check-image-version
+      - get-latest-version
+    if: ${{ needs.check-image-version.outputs.skip == 'false' }}
 
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  #     - name: Docker login - docker hub
-  #       uses: azure/docker-login@v2
-  #       with:
-  #         username: ${{ secrets.USERNAME }}
-  #         password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Docker login - docker hub
+        uses: azure/docker-login@v2
+        with:
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-  #     - name: Docker login - ghcr
-  #       uses: azure/docker-login@v2
-  #       with:
-  #         login-server: ghcr.io
-  #         username: ${{ secrets.USERNAME }}
-  #         password: ${{ secrets.PASSWORD }}
+      - name: Docker login - ghcr
+        uses: azure/docker-login@v2
+        with:
+          login-server: ghcr.io
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
 
-  #     - name: Set up Qemu
-  #       uses: docker/setup-qemu-action@v3
+      - name: Set up Qemu
+        uses: docker/setup-qemu-action@v3
 
-  #     - name: Set up Docker Buildx
-  #       id: buildx
-  #       uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
 
-  #     - name: Output platforms
-  #       run: |
-  #         echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+      - name: Output platforms
+        run: |
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
 
-  #     - name: Build and push with latest tag
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         push: true
-  #         pull: true
-  #         platforms: linux/arm64,linux/amd64
-  #         build-args: |
-  #           OPENTTD_VERSION=${{ needs.get-latest-version.outputs.openttd }}
-  #           OPENGFX_VERSION=${{ needs.get-latest-version.outputs.opengfx }}
-  #         tags: |
-  #           rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
-  #           rogerrum/docker-openttd:latest
-  #           ghcr.io/rogerrum/docker-openttd:latest
-  #           ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+      - name: Build and push with latest tag
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          pull: true
+          platforms: linux/arm64,linux/amd64
+          build-args: |
+            OPENTTD_VERSION=${{ needs.get-latest-version.outputs.openttd }}
+            OPENGFX_VERSION=${{ needs.get-latest-version.outputs.opengfx }}
+          tags: |
+            rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+            rogerrum/docker-openttd:latest
+            ghcr.io/rogerrum/docker-openttd:latest
+            ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
 
-  #     - name: Docker Hub Description
-  #       if: github.event_name != 'pull_request'
-  #       uses: peter-evans/dockerhub-description@v4
-  #       with:
-  #         username: ${{ secrets.USERNAME }}
-  #         password: ${{ secrets.DOCKER_PASSWORD }}
-  #         repository: rogerrum/docker-openttd
+      - name: Docker Hub Description
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          repository: rogerrum/docker-openttd
 
-  #     # Trivy test
-  #     - name: Run Trivy vulnerability scanner
-  #       uses: aquasecurity/trivy-action@master
-  #       id: trivy
-  #       with:
-  #         image-ref: 'ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}'
-  #         format: 'sarif'
-  #         exit-code: '0'
-  #         ignore-unfixed: true
-  #         vuln-type: 'os,library'
-  #         severity: 'CRITICAL,HIGH'
-  #         output: results.sarif
+      # Trivy test
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        id: trivy
+        with:
+          image-ref: 'ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}'
+          format: 'sarif'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: results.sarif
 
-  #     - name: Upload Trivy scan results to GitHub Security tab
-  #       uses: github/codeql-action/upload-sarif@v3
-  #       if: always()
-  #       with:
-  #         sarif_file: 'results.sarif'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'results.sarif'
