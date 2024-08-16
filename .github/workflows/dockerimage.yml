@@ -65,79 +65,79 @@ jobs:
     outputs:
       skip: ${{ env.skip_build }}
 
-  build:
-    runs-on: ubuntu-latest
-    needs:
-      - check-image-version
-      - get-latest-version
-    if: ${{ needs.check-image-version.outputs.skip == 'false' }}
+  # build:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - check-image-version
+  #     - get-latest-version
+  #   if: ${{ needs.check-image-version.outputs.skip == 'false' }}
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Docker login - docker hub
-        uses: azure/docker-login@v2
-        with:
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+  #     - name: Docker login - docker hub
+  #       uses: azure/docker-login@v2
+  #       with:
+  #         username: ${{ secrets.USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Docker login - ghcr
-        uses: azure/docker-login@v2
-        with:
-          login-server: ghcr.io
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
+  #     - name: Docker login - ghcr
+  #       uses: azure/docker-login@v2
+  #       with:
+  #         login-server: ghcr.io
+  #         username: ${{ secrets.USERNAME }}
+  #         password: ${{ secrets.PASSWORD }}
 
-      - name: Set up Qemu
-        uses: docker/setup-qemu-action@v3
+  #     - name: Set up Qemu
+  #       uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       id: buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Output platforms
-        run: |
-          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+  #     - name: Output platforms
+  #       run: |
+  #         echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
 
-      - name: Build and push with latest tag
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          pull: true
-          platforms: linux/arm64,linux/amd64
-          build-args: |
-            OPENTTD_VERSION=${{ needs.get-latest-version.outputs.openttd }}
-            OPENGFX_VERSION=${{ needs.get-latest-version.outputs.opengfx }}
-          tags: |
-            rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
-            rogerrum/docker-openttd:latest
-            ghcr.io/rogerrum/docker-openttd:latest
-            ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+  #     - name: Build and push with latest tag
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         push: true
+  #         pull: true
+  #         platforms: linux/arm64,linux/amd64
+  #         build-args: |
+  #           OPENTTD_VERSION=${{ needs.get-latest-version.outputs.openttd }}
+  #           OPENGFX_VERSION=${{ needs.get-latest-version.outputs.opengfx }}
+  #         tags: |
+  #           rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
+  #           rogerrum/docker-openttd:latest
+  #           ghcr.io/rogerrum/docker-openttd:latest
+  #           ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}
 
-      - name: Docker Hub Description
-        if: github.event_name != 'pull_request'
-        uses: peter-evans/dockerhub-description@v4
-        with:
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: rogerrum/docker-openttd
+  #     - name: Docker Hub Description
+  #       if: github.event_name != 'pull_request'
+  #       uses: peter-evans/dockerhub-description@v4
+  #       with:
+  #         username: ${{ secrets.USERNAME }}
+  #         password: ${{ secrets.DOCKER_PASSWORD }}
+  #         repository: rogerrum/docker-openttd
 
-      # Trivy test
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        id: trivy
-        with:
-          image-ref: 'ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}'
-          format: 'sarif'
-          exit-code: '0'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          output: results.sarif
+  #     # Trivy test
+  #     - name: Run Trivy vulnerability scanner
+  #       uses: aquasecurity/trivy-action@master
+  #       id: trivy
+  #       with:
+  #         image-ref: 'ghcr.io/rogerrum/docker-openttd:${{ needs.get-latest-version.outputs.openttd }}'
+  #         format: 'sarif'
+  #         exit-code: '0'
+  #         ignore-unfixed: true
+  #         vuln-type: 'os,library'
+  #         severity: 'CRITICAL,HIGH'
+  #         output: results.sarif
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'results.sarif'
+  #     - name: Upload Trivy scan results to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       if: always()
+  #       with:
+  #         sarif_file: 'results.sarif'
