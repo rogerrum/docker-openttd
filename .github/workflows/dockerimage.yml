@@ -90,7 +90,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
 
       - name: Set up Qemu
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         id: buildx
